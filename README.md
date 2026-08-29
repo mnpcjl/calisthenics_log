@@ -1,2 +1,2 @@
-# Street_Workout_Log
+# calisthenics_log
 My voyage during calisthenics. 
