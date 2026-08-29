@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <title>街头健身打卡 · 数据备份版</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --card-bg: #111111;
+            --card-bg-hover: #1a1a1a;
+            --accent: #00FF41;
+            --accent-dim: #00cc34;
+            --orange: #FF6B00;
+            --red: #FF3B30;
+            --text: #FFFFFF;
+            --text-secondary: #AAAAAA;
+            --text-muted: #666666;
+            --border: #222222;
+            --border-active: #333333;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-xs: 6px;
+            --nav-height: 64px;
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --font-mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Helvetica Neue', sans-serif;
+            --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; width: 100%; background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 15px; line-height: 1.5; overflow: hidden; overscroll-behavior: none; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; user-select: none; -webkit-user-select: none; }
+        input, textarea, button { font-family: inherit; font-size: inherit; outline: none; border: none; background: none; color: inherit; -webkit-appearance: none; appearance: none; }
+        input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        button { cursor: pointer; touch-action: manipulation; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+        #app { display: flex; flex-direction: column; height: 100%; max-width: 480px; margin: 0 auto; position: relative; overflow: hidden; }
+        .app-header { flex-shrink: 0; padding: 20px 20px 12px; text-align: center; border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 10; }
+        .app-header .date-display { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+        .app-header .date-display .edit-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 20px; background: var(--orange); color: #000; margin-left: 8px; vertical-align: middle; letter-spacing: 0.3px; }
+        .app-header .quote { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 400; letter-spacing: 0.3px; }
+        .app-header .back-today-btn { display: none; margin-top: 8px; font-size: 12px; color: var(--accent); font-weight: 600; padding: 4px 14px; border: 1px solid var(--accent); border-radius: 20px; transition: var(--transition); }
+        .app-header .back-today-btn:active { transform: scale(0.95); background: var(--accent); color: #000; }
+        .app-header .back-today-btn.show { display: inline-block; }
+        .main-content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; padding-bottom: 12px; }
+        .main-content::-webkit-scrollbar { width: 0; background: transparent; }
+        .page { display: none; padding: 16px 16px 20px; animation: fadeIn 0.25s ease; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .status-section { margin-bottom: 16px; }
+        .status-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .status-btn { padding: 16px 8px; border-radius: var(--radius-sm); font-weight: 700; font-size: 14px; text-align: center; border: 2px solid var(--border); background: var(--card-bg); transition: var(--transition); letter-spacing: 0.5px; position: relative; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+        .status-btn .icon { font-size: 22px; line-height: 1; }
+        .status-btn:active { transform: scale(0.94); background: var(--card-bg-hover); }
+        .status-btn.worked { border-color: var(--accent); background: rgba(0,255,65,0.08); color: var(--accent); box-shadow: 0 0 24px rgba(0,255,65,0.12); }
+        .status-btn.missed { border-color: var(--red); background: rgba(255,59,48,0.08); color: var(--red); box-shadow: 0 0 24px rgba(255,59,48,0.1); }
+        .status-btn.rest { border-color: var(--orange); background: rgba(255,107,0,0.08); color: var(--orange); box-shadow: 0 0 24px rgba(255,107,0,0.1); }
+        .exercise-section { display: none; animation: fadeIn 0.3s ease; }
+        .exercise-section.visible { display: block; }
+        .search-section { background: var(--card-bg); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; border: 1px solid var(--border); }
+        .search-row { display: flex; gap: 8px; }
+        .search-input { flex: 1; padding: 10px 14px; border-radius: var(--radius-xs); border: 1.5px solid var(--border); background: #0a0a0a; color: var(--text); font-size: 14px; transition: var(--transition); }
+        .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,255,65,0.1); }
+        .search-add-btn { padding: 10px 16px; border-radius: var(--radius-xs); background: var(--accent); color: #000; font-weight: 700; font-size: 13px; transition: var(--transition); white-space: nowrap; }
+        .search-add-btn:active { transform: scale(0.92); background: var(--accent-dim); }
+        .search-suggestions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .suggestion-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid var(--border); font-size: 12px; font-weight: 600; background: transparent; color: var(--text-secondary); transition: var(--transition); }
+        .suggestion-chip:active { transform: scale(0.92); border-color: var(--accent); color: var(--accent); }
+        .recommend-section { margin-bottom: 12px; }
+        .recommend-section .section-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px; }
+        .recommend-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .recommend-btn { display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 20px; border: 1.5px solid var(--border); font-size: 13px; font-weight: 600; cursor: pointer; transition: var(--transition); background: transparent; color: var(--text-secondary); }
+        .recommend-btn.checked { border-color: var(--accent); color: var(--accent); background: rgba(0,255,65,0.06); }
+        .recommend-btn:active { transform: scale(0.94); }
+        .exercise-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+        .exercise-card { background: var(--card-bg); border-radius: var(--radius); padding: 14px; border: 1px solid var(--border); transition: var(--transition); }
+        .exercise-card .card-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+        .exercise-card .ex-name { font-weight: 700; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .mode-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px; letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0; }
+        .mode-badge.dynamic { background: rgba(0,255,65,0.15); color: var(--accent); }
+        .mode-badge.static { background: rgba(255,107,0,0.15); color: var(--orange); }
+        .card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .card-action-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; border: 1.5px solid var(--border); background: transparent; color: var(--text-secondary); transition: var(--transition); }
+        .card-action-btn:active { transform: scale(0.88); background: var(--card-bg-hover); }
+        .card-action-btn.switch-btn { border-color: var(--accent); color: var(--accent); }
+        .card-action-btn.delete-btn { border-color: var(--red); color: var(--red); }
+        .mode-a-inputs, .mode-b-inputs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .mode-a-inputs .input-group, .mode-b-inputs .input-group { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+        .mode-a-inputs label, .mode-b-inputs label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+        .mode-a-inputs input, .mode-b-inputs input, .mode-b-sets-list input, .load-input-group input { width: 48px; padding: 8px 10px; border-radius: var(--radius-xs); border: 1.5px solid var(--border); background: #0a0a0a; color: var(--text); font-size: 14px; font-weight: 600; text-align: center; transition: var(--transition); user-select: text; -webkit-user-select: text; }
+        .mode-a-inputs input:focus, .mode-b-inputs input:focus, .mode-b-sets-list input:focus, .load-input-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,255,65,0.1); }
+        .sets-preview { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); background: #0a0a0a; padding: 4px 10px; border-radius: var(--radius-xs); border: 1px solid var(--border); }
+        .mode-b-sets-list { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+        .set-input-group { display: flex; align-items: center; gap: 3px; }
+        .set-input-group span { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+        .add-set-btn { padding: 7px 12px; border-radius: var(--radius-xs); border: 1.5px dashed var(--border); color: var(--text-muted); font-size: 12px; font-weight: 600; }
+        .remove-set-btn { padding: 7px 8px; border-radius: var(--radius-xs); border: 1px solid var(--red); color: var(--red); font-size: 12px; font-weight: 600; }
+        .load-input-group { display: flex; align-items: center; gap: 4px; margin-left: 4px; }
+        .calendar-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 12px; }
+        .cal-nav-btn { width: 38px; height: 38px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--text-secondary); font-size: 18px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+        .cal-month-label { font-size: 16px; font-weight: 700; flex: 1; text-align: center; }
+        .cal-weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
+        .cal-weekday { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted); padding: 6px 0; }
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .cal-cell { aspect-ratio: 1; border-radius: var(--radius-xs); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--text-secondary); transition: var(--transition); cursor: pointer; min-height: 40px; }
+        .cal-cell.future { opacity: 0.35; pointer-events: none; }
+        .cal-cell.empty { background: transparent; border-color: transparent; pointer-events: none; }
+        .cal-cell.today-cell { border-color: var(--orange); box-shadow: 0 0 12px rgba(255,107,0,0.2); }
+        .cal-cell.worked-cell, .cal-cell.rest-cell { border-color: var(--accent); background: rgba(0,255,65,0.08); color: var(--accent); }
+        .cal-cell.missed-cell { border-color: var(--red); background: rgba(255,59,48,0.08); color: var(--red); }
+        .cal-cell.no-record { border-color: var(--border); background: var(--card-bg); color: var(--text-muted); }
+        .ai-section, .personal-section, .data-section { background: var(--card-bg); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; border: 1px solid var(--border); }
+        .ai-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--orange); margin-bottom: 10px; }
+        .ai-feedback { font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px; }
+        .ai-item { padding: 8px 10px; border-radius: var(--radius-xs); background: #0a0a0a; border-left: 3px solid var(--accent); font-size: 12.5px; }
+        .stats-list { display: flex; flex-direction: column; gap: 10px; }
+        .stat-card { background: var(--card-bg); border-radius: var(--radius); padding: 14px; border: 1px solid var(--border); }
+        .stat-name { font-weight: 700; font-size: 15px; margin-bottom: 8px; }
+        .stat-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .stat-metric { text-align: center; background: #0a0a0a; border-radius: var(--radius-xs); padding: 8px 4px; border: 1px solid var(--border); }
+        .metric-value { font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--accent); }
+        .metric-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+        .tab-bar { flex-shrink: 0; display: flex; border-top: 1px solid var(--border); background: rgba(0,0,0,0.92); backdrop-filter: blur(20px); padding-bottom: var(--safe-bottom); height: calc(var(--nav-height) + var(--safe-bottom)); }
+        .tab-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: var(--text-muted); transition: var(--transition); }
+        .tab-btn.active { color: var(--accent); }
+        .tab-btn .tab-icon { font-size: 22px; }
+        .data-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+        .data-btn { padding: 10px 16px; border-radius: var(--radius-xs); border: 1.5px solid var(--border); background: transparent; color: var(--text-secondary); font-weight: 600; font-size: 13px; transition: var(--transition); }
+        .data-btn.export { border-color: var(--accent); color: var(--accent); }
+        .data-btn.import { border-color: var(--orange); color: var(--orange); }
+        .data-btn:active { transform: scale(0.95); background: var(--card-bg-hover); }
+        @media (max-width: 380px) {
+            .status-btn { padding: 12px 4px; font-size: 12px; }
+            .stat-card .stat-metrics { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+            .cal-cell { font-size: 11px; min-height: 34px; }
+            .exercise-card .ex-name { font-size: 13px; }
+            .mode-a-inputs input, .mode-b-inputs input, .mode-b-sets-list input { width: 42px; font-size: 13px; padding: 6px 6px; }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <header class="app-header" id="appHeader">
+        <div class="date-display" id="headerDate">今日打卡</div>
+        <div class="quote">身体不会骗你，纪录只为遇见更强的自己。</div>
+        <button class="back-today-btn" id="backTodayBtn">← 回到今天</button>
+    </header>
+    <main class="main-content" id="mainContent">
+        <div class="page active" id="pageToday">
+            <div class="status-section">
+                <div class="status-buttons" id="statusButtons">
+                    <button class="status-btn" data-status="worked"><span class="icon">💪</span><span>练了</span></button>
+                    <button class="status-btn" data-status="missed"><span class="icon">❌</span><span>没练</span></button>
+                    <button class="status-btn" data-status="rest"><span class="icon">🌿</span><span>休息</span></button>
+                </div>
+            </div>
+            <div class="exercise-section" id="exerciseSection">
+                <div class="search-section">
+                    <div class="search-row">
+                        <input type="text" class="search-input" id="searchInput" placeholder="搜索动作名称..." autocomplete="off">
+                        <button class="search-add-btn" id="searchAddBtn">添加</button>
+                    </div>
+                    <div class="search-suggestions" id="searchSuggestions"></div>
+                </div>
+                <div class="recommend-section">
+                    <div class="section-label">推荐动作</div>
+                    <div class="recommend-list" id="recommendList"></div>
+                </div>
+                <div class="exercise-list" id="exerciseList"></div>
+            </div>
+        </div>
+        <div class="page" id="pageCalendar">
+            <div class="calendar-nav">
+                <button class="cal-nav-btn" id="calPrevBtn">‹</button>
+                <span class="cal-month-label" id="calMonthLabel">2026年8月</span>
+                <button class="cal-nav-btn" id="calNextBtn">›</button>
+            </div>
+            <div class="cal-weekday-row">
+                <span class="cal-weekday">日</span><span class="cal-weekday">一</span><span class="cal-weekday">二</span><span class="cal-weekday">三</span><span class="cal-weekday">四</span><span class="cal-weekday">五</span><span class="cal-weekday">六</span>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+        </div>
+        <div class="page" id="pageStats">
+            <div class="personal-section">
+                <div class="section-label">个人数据</div>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:0;"><label style="font-size:11px; color:var(--text-muted);">身高(cm)</label><input type="number" inputmode="decimal" id="heightInput" placeholder="175" style="width:100%; padding:10px; border-radius:6px; border:1.5px solid var(--border); background:#0a0a0a; color:var(--text);"></div>
+                    <div style="flex:1; min-width:0;"><label style="font-size:11px; color:var(--text-muted);">体重(kg)</label><input type="number" inputmode="decimal" id="weightInput" placeholder="70" style="width:100%; padding:10px; border-radius:6px; border:1.5px solid var(--border); background:#0a0a0a; color:var(--text);"></div>
+                </div>
+            </div>
+            <div class="data-section">
+                <div class="section-label">数据备份</div>
+                <div class="data-buttons">
+                    <button class="data-btn export" id="exportBtn">导出数据</button>
+                    <button class="data-btn import" id="importBtn">导入数据</button>
+                    <input type="file" id="importFileInput" accept=".json,application/json" style="display:none;">
+                </div>
+            </div>
+            <div class="ai-section">
+                <div class="ai-title">⚡ AI 周报分析</div>
+                <div class="ai-feedback" id="aiFeedback"></div>
+            </div>
+            <div class="stats-list" id="statsList"></div>
+        </div>
+    </main>
+    <nav class="tab-bar" id="tabBar">
+        <button class="tab-btn active" data-tab="today"><span class="tab-icon">📋</span><span>今日</span></button>
+        <button class="tab-btn" data-tab="calendar"><span class="tab-icon">📅</span><span>日历</span></button>
+        <button class="tab-btn" data-tab="stats"><span class="tab-icon">📊</span><span>记录</span></button>
+    </nav>
+</div>
+<script>
+(function() {
+    const STORAGE_KEY = 'streetWorkoutLog_v7';
+    const PERSONAL_KEY = 'streetWorkoutPersonal_v7';
+    const DATA_VERSION = 1;
+    const STATUS_WORKED = 'worked';
+    const STATUS_MISSED = 'missed';
+    const STATUS_REST = 'rest';
+
+    const EXERCISE_TYPES = {
+        '引体向上':'dynamic', '双杠臂屈伸':'dynamic', '俯卧撑':'dynamic', '深蹲':'dynamic',
+        '弓箭步':'dynamic', '桥式':'dynamic', '波比跳':'dynamic', '登山跑':'dynamic',
+        '悬垂举腿':'dynamic', '卷腹':'dynamic', '仰卧起坐':'dynamic', '倒立撑':'dynamic',
+        '双力臂':'dynamic', '单臂引体向上':'dynamic', '宽距引体向上':'dynamic', '反手引体向上':'dynamic',
+        '腰间俯卧撑':'dynamic', '冲刺跑':'dynamic', '俄挺俯卧撑':'dynamic', '单腿深蹲':'dynamic',
+        '负重引体向上':'dynamic', '负重双杠臂屈伸':'dynamic', '负重俯卧撑':'dynamic', '负重深蹲':'dynamic',
+        '单力臂':'dynamic', '前水平引体':'dynamic', '后水平引体':'dynamic',
+        '划船':'dynamic', '负重划船':'dynamic',
+        '前水平':'static', '后水平':'static', '人体旗帜':'static', '倒立':'static',
+        'L支撑':'static', 'V支撑':'static', '俄式挺身':'static', '冲肩':'static',
+        '平板支撑':'static', '龙旗':'static', '单手前水平':'static', '单手倒立':'static',
+        '双杠支撑':'static', '单杠悬挂':'static', '单手俄挺':'static', '俄挺团身':'static',
+        '俄挺高团':'static', '分腿俄挺':'static', '单手吊杠':'static'
+    };
+    const EXERCISE_LIBRARY = Object.keys(EXERCISE_TYPES);
+    const PRESET_EXERCISES = ['引体向上', '双杠臂屈伸', '俯卧撑'];
+
+    let trainingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    let personalData = JSON.parse(localStorage.getItem(PERSONAL_KEY) || '{"height":null,"weight":null}');
+    let currentTab = 'today';
+    let currentEditingDate = getTodayStr();
+    let calViewYear = new Date().getFullYear();
+    let calViewMonth = new Date().getMonth();
+
+    const $ = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
+    const pageToday = $('#pageToday'), pageCalendar = $('#pageCalendar'), pageStats = $('#pageStats');
+    const headerDate = $('#headerDate'), backTodayBtn = $('#backTodayBtn'), statusButtons = $('#statusButtons');
+    const exerciseSection = $('#exerciseSection'), recommendList = $('#recommendList'), searchInput = $('#searchInput'), searchSuggestions = $('#searchSuggestions'), searchAddBtn = $('#searchAddBtn');
+    const exerciseList = $('#exerciseList'), calGrid = $('#calGrid'), calMonthLabel = $('#calMonthLabel'), calPrevBtn = $('#calPrevBtn'), calNextBtn = $('#calNextBtn');
+    const statsList = $('#statsList'), aiFeedback = $('#aiFeedback'), heightInput = $('#heightInput'), weightInput = $('#weightInput');
+    const exportBtn = $('#exportBtn'), importBtn = $('#importBtn'), importFileInput = $('#importFileInput');
+    const tabBar = $('#tabBar');
+
+    function getTodayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+    function parseDateStr(str){ const [y,m,d]=str.split('-').map(Number); return new Date(y,m-1,d); }
+    function isFutureDate(str){ return str > getTodayStr(); }
+    function isToday(str){ return str === getTodayStr(); }
+    function addDays(str, days){ const d=parseDateStr(str); d.setDate(d.getDate()+days); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+    function getDateRange(end, daysBack){ const res=[]; for(let i=daysBack-1;i>=0;i--) res.push(addDays(end,-i)); return res; }
+
+    function isDynamicExercise(name){
+        if(EXERCISE_TYPES[name]) return EXERCISE_TYPES[name] === 'dynamic';
+        const lower = name.toLowerCase();
+        if(lower.includes('引体') || lower.includes('俯卧撑') || lower.includes('双杠') || lower.includes('深蹲') || lower.includes('臂屈伸') || lower.includes('划船') || lower.includes('推') || lower.includes('蹲') || lower.includes('跑') || lower.includes('跳') || lower.includes('卷腹') || lower.includes('举腿') || lower.includes('撑')) return true;
+        if(lower.includes('水平') || lower.includes('倒立') || lower.includes('支撑') || lower.includes('俄挺') || lower.includes('团身') || lower.includes('高团') || lower.includes('分腿') || lower.includes('吊杠') || lower.includes('龙旗') || lower.includes('平板') || lower.includes('冲肩') || lower.includes('旗帜')) return false;
+        return true;
+    }
+
+    function saveData(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(trainingData)); }
+    function savePersonal(){ localStorage.setItem(PERSONAL_KEY, JSON.stringify(personalData)); }
+    function getDayData(dateStr){ return trainingData[dateStr] || null; }
+    function setDayData(dateStr, data){ if(data.status===STATUS_MISSED || data.status===STATUS_REST) data.exercises=[]; trainingData[dateStr]=data; saveData(); }
+    function getCurrentDayData(){ return getDayData(currentEditingDate) || {status:null, exercises:[]}; }
+
+    function renderHeader(){
+        if(isToday(currentEditingDate)){ headerDate.textContent='今日打卡'; backTodayBtn.classList.remove('show'); }
+        else { headerDate.innerHTML=`${currentEditingDate} <span class="edit-badge">编辑</span>`; backTodayBtn.classList.add('show'); }
+    }
+    function renderStatusButtons(){
+        const status = getCurrentDayData().status;
+        $$('.status-btn').forEach(btn => {
+            btn.classList.remove('worked','missed','rest');
+            if(btn.dataset.status === status) btn.classList.add(status);
+        });
+    }
+    function getRecommendActions(){
+        const freqMap = {};
+        for(const dateStr in trainingData){
+            const day = trainingData[dateStr];
+            if(day && day.status===STATUS_WORKED && Array.isArray(day.exercises)){
+                day.exercises.forEach(ex => { if(ex && ex.name) freqMap[ex.name] = (freqMap[ex.name]||0)+1; });
+            }
+        }
+        const sorted = Object.entries(freqMap).sort((a,b)=>b[1]-a[1]).map(([name])=>name);
+        const recommended = [];
+        const seen = new Set();
+        for(let i=0; i<sorted.length && recommended.length<3; i++){
+            const name = sorted[i];
+            if(!seen.has(name)) { recommended.push(name); seen.add(name); }
+        }
+        for(let i=0; i<PRESET_EXERCISES.length && recommended.length<3; i++){
+            const name = PRESET_EXERCISES[i];
+            if(!seen.has(name)) { recommended.push(name); seen.add(name); }
+        }
+        for(let i=0; i<EXERCISE_LIBRARY.length && recommended.length<3; i++){
+            const name = EXERCISE_LIBRARY[i];
+            if(!seen.has(name)) { recommended.push(name); seen.add(name); }
+        }
+        return recommended;
+    }
+    function renderRecommendations(){
+        const recs = getRecommendActions();
+        const currentExercises = getCurrentDayData().exercises || [];
+        let html='';
+        recs.forEach(name => {
+            const checked = currentExercises.some(ex => ex.name === name);
+            html += `<button class="recommend-btn ${checked?'checked':''}" data-name="${name}">${checked?'✓ ':''}${name}</button>`;
+        });
+        recommendList.innerHTML = html;
+    }
+    function renderSearchSuggestions(){
+        const query = searchInput.value.trim().toLowerCase();
+        if(!query){ searchSuggestions.innerHTML=''; return; }
+        const allNames = new Set(EXERCISE_LIBRARY);
+        for(const dateStr in trainingData){
+            const day=trainingData[dateStr];
+            if(day && day.status===STATUS_WORKED && Array.isArray(day.exercises)){
+                day.exercises.forEach(ex=>{ if(ex.name) allNames.add(ex.name); });
+            }
+        }
+        const matches = [...allNames].filter(n => n.toLowerCase().includes(query)).slice(0,8);
+        searchSuggestions.innerHTML = matches.map(n => `<button class="suggestion-chip" data-name="${n}">${n}</button>`).join('');
+    }
+    function renderExerciseList(){
+        const exercises = getCurrentDayData().exercises || [];
+        if(exercises.length===0){ exerciseList.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);">暂无动作，点击推荐或搜索添加</div>'; return; }
+        let html='';
+        exercises.forEach((ex, idx)=>{
+            const isDynamic = isDynamicExercise(ex.name);
+            const typeLabel = isDynamic ? '动态' : '静态';
+            const badgeClass = isDynamic ? 'dynamic' : 'static';
+            const isModeA = ex._mode !== 'B';
+            let inputsHtml='';
+            if(isModeA){
+                const numSets=ex.sets.length;
+                const avgVal=numSets>0?Math.round(ex.sets.reduce((a,b)=>a+b,0)/numSets):5;
+                const unit=isDynamic?'次':'秒';
+                inputsHtml=`<div class="mode-a-inputs">
+                    <div class="input-group"><label>组数</label><input type="number" inputmode="numeric" min="1" max="30" value="${numSets}" data-idx="${idx}" data-field="numSets" class="mode-a-field"></div>
+                    <div class="input-group"><label>每组${unit}</label><input type="number" inputmode="numeric" min="0" max="999" value="${avgVal}" data-idx="${idx}" data-field="repsPerSet" class="mode-a-field"></div>
+                    <span class="sets-preview">[${ex.sets.join(', ')}]</span>
+                </div>`;
+            } else {
+                let setInputsHtml='';
+                ex.sets.forEach((rep, setIdx)=>{
+                    const unit=isDynamic?'次':'秒';
+                    setInputsHtml+=`<div class="set-input-group"><span>#${setIdx+1}</span><input type="number" inputmode="numeric" min="0" max="999" value="${rep}" data-idx="${idx}" data-set-idx="${setIdx}" class="mode-b-field" placeholder="${unit}">`;
+                    if(ex.sets.length>1) setInputsHtml+=`<button class="remove-set-btn" data-idx="${idx}" data-set-idx="${setIdx}" data-action="removeSet">✕</button>`;
+                    setInputsHtml+=`</div>`;
+                });
+                inputsHtml=`<div class="mode-b-inputs"><div class="mode-b-sets-list">${setInputsHtml}</div><button class="add-set-btn" data-idx="${idx}" data-action="addSet">+ 加一组</button></div>`;
+            }
+            const loadVal = ex.load || 0;
+            inputsHtml += `<div class="load-input-group"><label>负重kg</label><input type="number" inputmode="decimal" min="0" max="500" step="0.5" value="${loadVal}" data-idx="${idx}" data-field="load" class="load-field"></div>`;
+            html += `<div class="exercise-card" data-idx="${idx}">
+                <div class="card-header">
+                    <span class="ex-name">${ex.name}</span>
+                    <span class="mode-badge ${badgeClass}">${typeLabel}</span>
+                    <div class="card-actions">
+                        <button class="card-action-btn switch-btn" data-idx="${idx}" data-action="toggleMode">⇄</button>
+                        <button class="card-action-btn delete-btn" data-idx="${idx}" data-action="deleteEx">✕</button>
+                    </div>
+                </div>
+                ${inputsHtml}
+            </div>`;
+        });
+        exerciseList.innerHTML=html;
+    }
+    function renderExerciseSection(){
+        const data=getCurrentDayData();
+        if(data.status===STATUS_WORKED){ exerciseSection.classList.add('visible'); renderRecommendations(); renderSearchSuggestions(); renderExerciseList(); }
+        else { exerciseSection.classList.remove('visible'); }
+    }
+
+    function renderCalendar(){
+        calMonthLabel.textContent=`${calViewYear}年${calViewMonth+1}月`;
+        const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
+        const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
+        const todayStr = getTodayStr();
+        let cells='';
+        for(let i=0;i<firstDay;i++) cells+='<div class="cal-cell empty"></div>';
+        for(let d=1; d<=daysInMonth; d++){
+            const dateStr=`${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const data = getDayData(dateStr);
+            const future = isFutureDate(dateStr);
+            const isTodayCell = dateStr===todayStr;
+            let cls='cal-cell'; let icon='';
+            if(future) cls+=' future';
+            else {
+                if(data && data.status===STATUS_WORKED){ cls+=' worked-cell'; icon='✓'; }
+                else if(data && data.status===STATUS_REST){ cls+=' rest-cell'; icon='✓'; }
+                else if(data && data.status===STATUS_MISSED){ cls+=' missed-cell'; icon='✕'; }
+                else { cls+=' no-record'; icon='·'; }
+            }
+            if(isTodayCell) cls+=' today-cell';
+            cells += `<div class="${cls}" data-date="${dateStr}"><span class="day-num">${d}</span><span class="cell-icon">${icon}</span></div>`;
+        }
+        const total = firstDay + daysInMonth;
+        const rem = total % 7;
+        if(rem!==0) for(let i=0;i<7-rem;i++) cells+='<div class="cal-cell empty"></div>';
+        calGrid.innerHTML = cells;
+    }
+
+    function aggregateAllExercises(){
+        const map={};
+        for(const dateStr in trainingData){
+            const day=trainingData[dateStr];
+            if(!day || day.status!==STATUS_WORKED) continue;
+            (day.exercises||[]).forEach(ex=>{
+                if(!ex || !ex.name || !Array.isArray(ex.sets) || ex.sets.length===0) return;
+                const name=ex.name.trim(); if(!name) return;
+                if(!map[name]) map[name]={name, pr:0, low:Infinity, totalVolume:0, frequency:0, prLoad:0, totalLoad:0, maxLoad:0, loadCount:0};
+                const entry=map[name];
+                const isDyn = isDynamicExercise(name);
+                ex.sets.forEach(rep=>{
+                    rep=Number(rep)||0;
+                    if(rep>entry.pr) entry.pr=rep;
+                    if(rep>0 && rep<entry.low) entry.low=rep;
+                    entry.totalVolume += rep;
+                });
+                const load = Number(ex.load)||0;
+                if(load > 0){
+                    entry.totalLoad += load;
+                    entry.loadCount++;
+                    if(load > entry.maxLoad) entry.maxLoad = load;
+                }
+                entry.frequency++;
+            });
+        }
+        return Object.values(map).map(e=>{ if(e.low===Infinity) e.low=0; return e; });
+    }
+
+    function renderStats(){
+        const all=aggregateAllExercises();
+        if(all.length===0){ statsList.innerHTML='<div class="no-data-msg">暂无训练数据</div>'; return; }
+        all.sort((a,b)=>b.totalVolume-a.totalVolume);
+        let html='';
+        all.forEach(ex=>{
+            const isDyn = isDynamicExercise(ex.name);
+            const unit = isDyn?'次':'秒';
+            html += `<div class="stat-card">
+                <div class="stat-name">${ex.name}</div>
+                <div class="stat-metrics">
+                    <div class="stat-metric"><div class="metric-value">${ex.pr}${unit}</div><div class="metric-label">最高${isDyn?'PR':'保持'}</div></div>
+                    <div class="stat-metric"><div class="metric-value">${ex.low===0?'—':ex.low}${unit}</div><div class="metric-label">最低组</div></div>
+                    <div class="stat-metric"><div class="metric-value">${ex.totalVolume}${unit}</div><div class="metric-label">总容量</div></div>
+                    <div class="stat-metric"><div class="metric-value">${ex.frequency}天</div><div class="metric-label">频次</div></div>
+                </div>
+            </div>`;
+        });
+        statsList.innerHTML=html;
+    }
+
+    function renderAI(){
+        const all=aggregateAllExercises();
+        if(all.length===0){ aiFeedback.innerHTML='<div class="ai-item neutral">暂无数据，开始你的第一次训练吧。</div>'; return; }
+        all.sort((a,b)=>b.totalVolume-a.totalVolume);
+        const top=all[0];
+        const today=getTodayStr();
+        const last7=getDateRange(today,7);
+        const prev7=getDateRange(addDays(today,-7),7);
+        const prLast = getPRForDates(top.name,last7);
+        const prPrev = getPRForDates(top.name,prev7);
+        let peakText='';
+        if(prPrev>0 && prLast>0){
+            const pct=Math.round(((prLast-prPrev)/prPrev)*100);
+            if(pct>0) peakText=`🔥 巅峰对比：「${top.name}」单组最高从${prPrev}升至${prLast}，提升${pct}%！`;
+            else if(pct<0) peakText=`📉 巅峰对比：「${top.name}」单组最高从${prPrev}降至${prLast}，下降${Math.abs(pct)}%。`;
+            else peakText=`📊 巅峰对比：「${top.name}」单组最高维持${prLast}，状态稳定。`;
+        } else if(prLast>0) peakText=`🚀 巅峰对比：最近7天「${top.name}」单组最高${prLast}，有新突破！`;
+        else peakText=`📊 巅峰对比：最近7天暂无「${top.name}」的PR数据。`;
+
+        const now=new Date(); const y=now.getFullYear(); const m=now.getMonth(); const todayDay=now.getDate();
+        let missed=0, passed=0;
+        for(let d=1; d<=todayDay; d++){
+            const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            passed++;
+            const dd=getDayData(ds);
+            if(dd && dd.status===STATUS_MISSED) missed++;
+        }
+        const pctMissed = passed>0 ? (missed/passed)*100 : 0;
+        let willText='';
+        if(pctMissed>30) willText=`⚠️ 毅力考验：本月${missed}天没练（${Math.round(pctMissed)}%），别松懈！`;
+        else if(pctMissed<10) willText=`🌟 毅力考验：本月仅${missed}天没练（${Math.round(pctMissed)}%），自律超强！`;
+        else willText=`📊 毅力考验：本月${missed}天没练（${Math.round(pctMissed)}%），保持节奏。`;
+
+        const monthExercises=new Set();
+        for(let d=1; d<=todayDay; d++){
+            const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const dd=getDayData(ds);
+            if(dd && dd.status===STATUS_WORKED) (dd.exercises||[]).forEach(ex=>{ if(ex.name) monthExercises.add(ex.name); });
+        }
+        const divText=`🎯 动作多样性：本月使用 ${monthExercises.size} 种动作。`;
+
+        let loadText='';
+        const weight = personalData.weight ? Number(personalData.weight) : null;
+        const loadedExercises = all.filter(ex => ex.maxLoad > 0);
+        if(loadedExercises.length > 0 && weight){
+            const bestLoaded = loadedExercises.reduce((a,b) => (a.maxLoad/a.frequency > b.maxLoad/b.frequency) ? a : b);
+            const ratio = (bestLoaded.maxLoad / weight) * 100;
+            loadText = `🏋️ 负重分析：你的「${bestLoaded.name}」最大负重${bestLoaded.maxLoad}kg，相当于体重的${ratio.toFixed(1)}%，${ratio > 50 ? '非常强悍！' : ratio > 25 ? '上肢拉力出色。' : '继续努力提升。'}`;
+        } else if(loadedExercises.length > 0){
+            const bestLoaded = loadedExercises.reduce((a,b) => a.maxLoad > b.maxLoad ? a : b);
+            loadText = `🏋️ 负重分析：你的「${bestLoaded.name}」最大负重${bestLoaded.maxLoad}kg。填写体重可计算相对力量。`;
+        }
+
+        aiFeedback.innerHTML = `
+            <div class="ai-item">${peakText}</div>
+            <div class="ai-item">${willText}</div>
+            <div class="ai-item">${divText}</div>
+            ${loadText ? `<div class="ai-item">${loadText}</div>` : ''}
+        `;
+    }
+    function getPRForDates(name, dateList){
+        let pr=0;
+        dateList.forEach(ds=>{
+            const dd=getDayData(ds);
+            if(dd && dd.status===STATUS_WORKED) (dd.exercises||[]).forEach(ex=>{
+                if(ex.name===name && Array.isArray(ex.sets)) ex.sets.forEach(r=>{ r=Number(r)||0; if(r>pr) pr=r; });
+            });
+        });
+        return pr;
+    }
+
+    function switchTab(tab){
+        currentTab=tab;
+        $$('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+        pageToday.classList.toggle('active', tab==='today');
+        pageCalendar.classList.toggle('active', tab==='calendar');
+        pageStats.classList.toggle('active', tab==='stats');
+        if(tab==='today'){ renderHeader(); renderStatusButtons(); renderExerciseSection(); }
+        else if(tab==='calendar') renderCalendar();
+        else if(tab==='stats'){ heightInput.value=personalData.height||''; weightInput.value=personalData.weight||''; renderStats(); renderAI(); }
+        $('#mainContent').scrollTop=0;
+    }
+
+    // 数据导出/导入
+    function exportData() {
+        const data = {
+            version: DATA_VERSION,
+            exportedAt: new Date().toISOString(),
+            trainingData: trainingData,
+            personalData: personalData
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `street-workout-backup-${getTodayStr()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function importData(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (!data || typeof data !== 'object') throw new Error('格式错误');
+                if (data.version !== DATA_VERSION) {
+                    if (!confirm(`备份文件版本 (${data.version}) 与当前版本 (${DATA_VERSION}) 不一致，可能无法正确导入。仍要继续吗？`)) return;
+                }
+                if (!data.trainingData || typeof data.trainingData !== 'object') throw new Error('缺少训练数据');
+                if (!data.personalData || typeof data.personalData !== 'object') data.personalData = {height:null, weight:null};
+                // 确认覆盖
+                if (confirm('导入将覆盖当前所有数据，确定继续吗？')) {
+                    trainingData = data.trainingData;
+                    personalData = data.personalData;
+                    saveData();
+                    savePersonal();
+                    // 刷新界面
+                    switchTab(currentTab);
+                    alert('数据导入成功！');
+                }
+            } catch (err) {
+                alert('导入失败：' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    exportBtn.addEventListener('click', exportData);
+    importBtn.addEventListener('click', ()=>{ importFileInput.click(); });
+    importFileInput.addEventListener('change', (e)=>{
+        const file = e.target.files[0];
+        if (file) importData(file);
+        importFileInput.value = ''; // 允许重复选择同一文件
+    });
+
+    tabBar.addEventListener('click', e=>{ const btn=e.target.closest('.tab-btn'); if(btn) switchTab(btn.dataset.tab); });
+    backTodayBtn.addEventListener('click', ()=>{ currentEditingDate=getTodayStr(); renderHeader(); renderStatusButtons(); renderExerciseSection(); });
+    statusButtons.addEventListener('click', e=>{
+        const btn=e.target.closest('.status-btn'); if(!btn) return;
+        const status=btn.dataset.status;
+        const data=getCurrentDayData();
+        data.status=status;
+        if(status===STATUS_MISSED || status===STATUS_REST) data.exercises=[];
+        else if(status===STATUS_WORKED && !data.exercises) data.exercises=[];
+        setDayData(currentEditingDate, data);
+        renderStatusButtons(); renderExerciseSection();
+    });
+
+    recommendList.addEventListener('click', e=>{
+        const btn=e.target.closest('.recommend-btn'); if(!btn) return;
+        const name=btn.dataset.name;
+        const data=getCurrentDayData();
+        if(data.status!==STATUS_WORKED) return;
+        if(!data.exercises) data.exercises=[];
+        const exists=data.exercises.some(ex=>ex.name===name);
+        if(exists) data.exercises = data.exercises.filter(ex=>ex.name!==name);
+        else data.exercises.push({name, sets:[5,5,5], _mode:'A', type:isDynamicExercise(name)?'dynamic':'static', load:0});
+        setDayData(currentEditingDate, data);
+        renderRecommendations(); renderExerciseList();
+    });
+    searchInput.addEventListener('input', renderSearchSuggestions);
+    searchAddBtn.addEventListener('click', ()=>{
+        const name=searchInput.value.trim();
+        if(!name) return;
+        const data=getCurrentDayData();
+        if(data.status!==STATUS_WORKED) return;
+        if(!data.exercises) data.exercises=[];
+        if(data.exercises.some(ex=>ex.name===name)) return;
+        data.exercises.push({name, sets:[5,5,5], _mode:'A', type:isDynamicExercise(name)?'dynamic':'static', load:0});
+        setDayData(currentEditingDate, data);
+        searchInput.value=''; renderSearchSuggestions(); renderRecommendations(); renderExerciseList();
+    });
+    searchSuggestions.addEventListener('click', e=>{
+        const btn=e.target.closest('.suggestion-chip'); if(!btn) return;
+        const name=btn.dataset.name;
+        searchInput.value=name; renderSearchSuggestions();
+        const data=getCurrentDayData();
+        if(data.status!==STATUS_WORKED) return;
+        if(!data.exercises) data.exercises=[];
+        if(data.exercises.some(ex=>ex.name===name)) return;
+        data.exercises.push({name, sets:[5,5,5], _mode:'A', type:isDynamicExercise(name)?'dynamic':'static', load:0});
+        setDayData(currentEditingDate, data);
+        renderRecommendations(); renderExerciseList();
+    });
+    exerciseList.addEventListener('click', e=>{
+        const btn=e.target.closest('button'); if(!btn) return;
+        const idx=parseInt(btn.dataset.idx); const action=btn.dataset.action;
+        const data=getCurrentDayData(); if(!data.exercises || idx>=data.exercises.length) return;
+        if(action==='toggleMode'){
+            const ex=data.exercises[idx];
+            const cur=ex._mode||'A';
+            if(cur==='A'){ const n=ex.sets.length; const avg=n>0?Math.round(ex.sets.reduce((a,b)=>a+b,0)/n):5; ex._mode='B'; ex.sets=Array(n).fill(avg); }
+            else{ const n=ex.sets.length; const avg=n>0?Math.round(ex.sets.reduce((a,b)=>a+b,0)/n):5; ex._mode='A'; ex.sets=Array(n).fill(avg); }
+            setDayData(currentEditingDate,data); renderExerciseList();
+        }
+        else if(action==='deleteEx'){ data.exercises.splice(idx,1); setDayData(currentEditingDate,data); renderRecommendations(); renderExerciseList(); }
+        else if(action==='addSet'){ const ex=data.exercises[idx]; if(ex._mode==='B'){ ex.sets.push(ex.sets.length?ex.sets[ex.sets.length-1]:5); setDayData(currentEditingDate,data); renderExerciseList(); } }
+        else if(action==='removeSet'){ const setIdx=parseInt(btn.dataset.setIdx); const ex=data.exercises[idx]; if(ex.sets.length>1 && setIdx<ex.sets.length){ ex.sets.splice(setIdx,1); setDayData(currentEditingDate,data); renderExerciseList(); } }
+    });
+    exerciseList.addEventListener('change', e=>{
+        const input=e.target; const idx=parseInt(input.dataset.idx); if(isNaN(idx)) return;
+        const data=getCurrentDayData(); if(!data.exercises || idx>=data.exercises.length) return;
+        const ex=data.exercises[idx]; const field=input.dataset.field;
+        if(input.classList.contains('mode-a-field')){
+            if(field==='numSets'){ const n=Math.max(1,parseInt(input.value)||1); const avg=ex.sets.length?Math.round(ex.sets.reduce((a,b)=>a+b,0)/ex.sets.length):5; ex.sets=Array(n).fill(avg); }
+            else if(field==='repsPerSet'){ const v=Math.max(0,parseInt(input.value)||0); ex.sets=Array(ex.sets.length).fill(v); }
+        }
+        else if(input.classList.contains('mode-b-field')){ const si=parseInt(input.dataset.setIdx); if(!isNaN(si)&&si<ex.sets.length) ex.sets[si]=Math.max(0,parseInt(input.value)||0); }
+        else if(input.classList.contains('load-field')){ ex.load=Math.max(0,parseFloat(input.value)||0); }
+        setDayData(currentEditingDate,data); renderExerciseList();
+    });
+    calGrid.addEventListener('click', e=>{
+        const cell=e.target.closest('.cal-cell'); if(!cell || cell.classList.contains('empty') || cell.classList.contains('future')) return;
+        const dateStr=cell.dataset.date; if(!dateStr) return;
+        currentEditingDate=dateStr; switchTab('today'); renderHeader(); renderStatusButtons(); renderExerciseSection();
+    });
+    calPrevBtn.addEventListener('click', ()=>{ calViewMonth--; if(calViewMonth<0){ calViewMonth=11; calViewYear--; } renderCalendar(); });
+    calNextBtn.addEventListener('click', ()=>{ calViewMonth++; if(calViewMonth>11){ calViewMonth=0; calViewYear++; } renderCalendar(); });
+    heightInput.addEventListener('change', ()=>{ personalData.height=heightInput.value?Number(heightInput.value):null; savePersonal(); renderAI(); });
+    weightInput.addEventListener('change', ()=>{ personalData.weight=weightInput.value?Number(weightInput.value):null; savePersonal(); renderAI(); });
+
+    function init(){
+        renderHeader(); renderStatusButtons(); renderExerciseSection(); renderCalendar();
+        heightInput.value=personalData.height||''; weightInput.value=personalData.weight||'';
+        renderStats(); renderAI();
+    }
+    init();
+})();
+</script>
+</body>
+</html>
