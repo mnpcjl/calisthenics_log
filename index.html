@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000">
-    <title>街头健身打卡 · 数据备份版</title>
+    <title>街头健身打卡 · 维多利亚版</title>
     <style>
         :root {
             --bg: #000000;
@@ -109,8 +109,10 @@
         .cal-cell.worked-cell, .cal-cell.rest-cell { border-color: var(--accent); background: rgba(0,255,65,0.08); color: var(--accent); }
         .cal-cell.missed-cell { border-color: var(--red); background: rgba(255,59,48,0.08); color: var(--red); }
         .cal-cell.no-record { border-color: var(--border); background: var(--card-bg); color: var(--text-muted); }
-        .ai-section, .personal-section, .data-section { background: var(--card-bg); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; border: 1px solid var(--border); }
-        .ai-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--orange); margin-bottom: 10px; }
+        .ai-section, .personal-section, .data-section, .chart-section { background: var(--card-bg); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; border: 1px solid var(--border); }
+        .ai-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--orange); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .focus-select-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 16px; border: 1.5px solid var(--accent); color: var(--accent); font-size: 12px; font-weight: 600; background: rgba(0,255,65,0.06); cursor: pointer; transition: var(--transition); }
+        .focus-select-btn:active { transform: scale(0.95); background: rgba(0,255,65,0.12); }
         .ai-feedback { font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px; }
         .ai-item { padding: 8px 10px; border-radius: var(--radius-xs); background: #0a0a0a; border-left: 3px solid var(--accent); font-size: 12.5px; }
         .stats-list { display: flex; flex-direction: column; gap: 10px; }
@@ -129,6 +131,17 @@
         .data-btn.export { border-color: var(--accent); color: var(--accent); }
         .data-btn.import { border-color: var(--orange); color: var(--orange); }
         .data-btn:active { transform: scale(0.95); background: var(--card-bg-hover); }
+        .chart-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 10px; }
+        .chart-canvas { width: 100%; height: 200px; background: #0a0a0a; border-radius: var(--radius-xs); border: 1px solid var(--border); }
+        .focus-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 30; display: none; align-items: flex-end; justify-content: center; }
+        .focus-overlay.show { display: flex; }
+        .focus-panel { width: 100%; max-width: 480px; background: var(--card-bg); border-radius: var(--radius) var(--radius) 0 0; padding: 16px 16px calc(16px + var(--safe-bottom)); border-top: 1px solid var(--border-active); animation: slideUp 0.25s ease; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .focus-panel-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+        .focus-panel-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+        .focus-panel-item { padding: 12px 14px; border-radius: var(--radius-xs); font-size: 14px; font-weight: 500; color: var(--text-secondary); transition: var(--transition); text-align: left; border: none; background: transparent; cursor: pointer; }
+        .focus-panel-item:active { background: var(--card-bg-hover); }
+        .focus-panel-item.active { background: rgba(0,255,65,0.08); color: var(--accent); font-weight: 700; }
         @media (max-width: 380px) {
             .status-btn { padding: 12px 4px; font-size: 12px; }
             .stat-card .stat-metrics { grid-template-columns: repeat(2, 1fr); gap: 4px; }
@@ -197,8 +210,15 @@
                 </div>
             </div>
             <div class="ai-section">
-                <div class="ai-title">⚡ AI 周报分析</div>
+                <div class="ai-title">
+                    ⚡ AI 周报分析
+                    <button class="focus-select-btn" id="focusSelectBtn">焦点动作 ▾</button>
+                </div>
                 <div class="ai-feedback" id="aiFeedback"></div>
+            </div>
+            <div class="chart-section" id="chartSection" style="display:none;">
+                <div class="chart-title">📈 负重趋势 · <span id="chartActionName"></span></div>
+                <canvas id="chartCanvas" class="chart-canvas"></canvas>
             </div>
             <div class="stats-list" id="statsList"></div>
         </div>
@@ -208,11 +228,17 @@
         <button class="tab-btn" data-tab="calendar"><span class="tab-icon">📅</span><span>日历</span></button>
         <button class="tab-btn" data-tab="stats"><span class="tab-icon">📊</span><span>记录</span></button>
     </nav>
+    <div class="focus-overlay" id="focusOverlay">
+        <div class="focus-panel">
+            <div class="focus-panel-title">选择焦点动作</div>
+            <div class="focus-panel-list" id="focusPanelList"></div>
+        </div>
+    </div>
 </div>
 <script>
 (function() {
-    const STORAGE_KEY = 'streetWorkoutLog_v7';
-    const PERSONAL_KEY = 'streetWorkoutPersonal_v7';
+    const STORAGE_KEY = 'streetWorkoutLog_v9';
+    const PERSONAL_KEY = 'streetWorkoutPersonal_v9';
     const DATA_VERSION = 1;
     const STATUS_WORKED = 'worked';
     const STATUS_MISSED = 'missed';
@@ -231,7 +257,8 @@
         'L支撑':'static', 'V支撑':'static', '俄式挺身':'static', '冲肩':'static',
         '平板支撑':'static', '龙旗':'static', '单手前水平':'static', '单手倒立':'static',
         '双杠支撑':'static', '单杠悬挂':'static', '单手俄挺':'static', '俄挺团身':'static',
-        '俄挺高团':'static', '分腿俄挺':'static', '单手吊杠':'static'
+        '俄挺高团':'static', '分腿俄挺':'static', '单手吊杠':'static',
+        '单杠维多利亚':'static', '单杠维多利亚低团':'static', '单杠维多利亚高团':'static'
     };
     const EXERCISE_LIBRARY = Object.keys(EXERCISE_TYPES);
     const PRESET_EXERCISES = ['引体向上', '双杠臂屈伸', '俯卧撑'];
@@ -242,6 +269,7 @@
     let currentEditingDate = getTodayStr();
     let calViewYear = new Date().getFullYear();
     let calViewMonth = new Date().getMonth();
+    let focusAction = null;
 
     const $ = s => document.querySelector(s);
     const $$ = s => document.querySelectorAll(s);
@@ -251,6 +279,8 @@
     const exerciseList = $('#exerciseList'), calGrid = $('#calGrid'), calMonthLabel = $('#calMonthLabel'), calPrevBtn = $('#calPrevBtn'), calNextBtn = $('#calNextBtn');
     const statsList = $('#statsList'), aiFeedback = $('#aiFeedback'), heightInput = $('#heightInput'), weightInput = $('#weightInput');
     const exportBtn = $('#exportBtn'), importBtn = $('#importBtn'), importFileInput = $('#importFileInput');
+    const chartSection = $('#chartSection'), chartCanvas = $('#chartCanvas'), chartActionName = $('#chartActionName');
+    const focusSelectBtn = $('#focusSelectBtn'), focusOverlay = $('#focusOverlay'), focusPanelList = $('#focusPanelList');
     const tabBar = $('#tabBar');
 
     function getTodayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
@@ -264,7 +294,7 @@
         if(EXERCISE_TYPES[name]) return EXERCISE_TYPES[name] === 'dynamic';
         const lower = name.toLowerCase();
         if(lower.includes('引体') || lower.includes('俯卧撑') || lower.includes('双杠') || lower.includes('深蹲') || lower.includes('臂屈伸') || lower.includes('划船') || lower.includes('推') || lower.includes('蹲') || lower.includes('跑') || lower.includes('跳') || lower.includes('卷腹') || lower.includes('举腿') || lower.includes('撑')) return true;
-        if(lower.includes('水平') || lower.includes('倒立') || lower.includes('支撑') || lower.includes('俄挺') || lower.includes('团身') || lower.includes('高团') || lower.includes('分腿') || lower.includes('吊杠') || lower.includes('龙旗') || lower.includes('平板') || lower.includes('冲肩') || lower.includes('旗帜')) return false;
+        if(lower.includes('水平') || lower.includes('倒立') || lower.includes('支撑') || lower.includes('俄挺') || lower.includes('团身') || lower.includes('高团') || lower.includes('分腿') || lower.includes('吊杠') || lower.includes('龙旗') || lower.includes('平板') || lower.includes('冲肩') || lower.includes('旗帜') || lower.includes('维多利亚')) return false;
         return true;
     }
 
@@ -442,6 +472,160 @@
         return Object.values(map).map(e=>{ if(e.low===Infinity) e.low=0; return e; });
     }
 
+    function getAllTrainedActions(){
+        const set = new Set();
+        for(const dateStr in trainingData){
+            const day = trainingData[dateStr];
+            if(day && day.status===STATUS_WORKED && Array.isArray(day.exercises)){
+                day.exercises.forEach(ex => { if(ex && ex.name) set.add(ex.name); });
+            }
+        }
+        return [...set];
+    }
+
+    function getFocusAction(){
+        if(focusAction) return focusAction;
+        const all = aggregateAllExercises();
+        if(all.length === 0) return null;
+        all.sort((a,b)=>b.totalVolume-a.totalVolume);
+        return all[0].name;
+    }
+
+    function renderFocusPanel(){
+        const actions = getAllTrainedActions();
+        const current = getFocusAction();
+        let html='';
+        if(actions.length===0){
+            html = '<div style="text-align:center;color:var(--text-muted);padding:20px;">暂无训练动作</div>';
+        } else {
+            actions.forEach(name => {
+                html += `<button class="focus-panel-item ${name===current?'active':''}" data-name="${name}">${name}</button>`;
+            });
+        }
+        focusPanelList.innerHTML = html;
+        focusSelectBtn.innerHTML = `${current || '选择动作'} ▾`;
+    }
+
+    function getFocusPRData(actionName, dateList){
+        const prs = [];
+        dateList.forEach(ds => {
+            const dd = getDayData(ds);
+            let max = 0;
+            if(dd && dd.status===STATUS_WORKED && Array.isArray(dd.exercises)){
+                dd.exercises.forEach(ex => {
+                    if(ex.name === actionName && Array.isArray(ex.sets)){
+                        ex.sets.forEach(r => { r=Number(r)||0; if(r>max) max=r; });
+                    }
+                });
+            }
+            prs.push(max);
+        });
+        return prs;
+    }
+
+    function getFocusLoadData(actionName){
+        const data = [];
+        const sortedDates = Object.keys(trainingData).sort();
+        sortedDates.forEach(dateStr => {
+            const day = trainingData[dateStr];
+            if(!day || day.status!==STATUS_WORKED) return;
+            let maxLoad = 0;
+            (day.exercises||[]).forEach(ex => {
+                if(ex.name === actionName){
+                    const load = Number(ex.load)||0;
+                    if(load > maxLoad) maxLoad = load;
+                }
+            });
+            data.push({ date: dateStr, load: maxLoad });
+        });
+        return data;
+    }
+
+    function renderChart(){
+        const actionName = getFocusAction();
+        if(!actionName){ chartSection.style.display='none'; return; }
+        const loadData = getFocusLoadData(actionName);
+        const hasData = loadData.some(d => d.load > 0);
+        if(!hasData){ chartSection.style.display='none'; return; }
+        chartSection.style.display='block';
+        chartActionName.textContent = actionName;
+        const canvas = chartCanvas;
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = 200 * dpr;
+        ctx.scale(dpr, dpr);
+        const w = rect.width;
+        const h = 200;
+        const padding = { top: 20, bottom: 30, left: 30, right: 10 };
+        const chartW = w - padding.left - padding.right;
+        const chartH = h - padding.top - padding.bottom;
+        const validData = loadData.filter(d => d.load > 0);
+        if(validData.length < 2){
+            ctx.fillStyle = '#666';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('数据不足，至少需要2天有负重记录', w/2, h/2);
+            return;
+        }
+        const maxLoad = Math.max(...validData.map(d => d.load));
+        const minLoad = Math.min(...validData.map(d => d.load));
+        const yRange = Math.max(maxLoad - minLoad, 1);
+        const yMax = maxLoad + yRange * 0.2;
+        const yMin = Math.max(0, minLoad - yRange * 0.2);
+        const xStep = chartW / (validData.length - 1);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 0.5;
+        for(let i=0; i<=4; i++){
+            const y = padding.top + chartH * (1 - i/4);
+            ctx.beginPath();
+            ctx.moveTo(padding.left, y);
+            ctx.lineTo(w - padding.right, y);
+            ctx.stroke();
+        }
+        ctx.fillStyle = '#666';
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'right';
+        for(let i=0; i<=4; i++){
+            const val = yMin + (yMax - yMin) * (i/4);
+            const y = padding.top + chartH * (1 - i/4);
+            ctx.fillText(val.toFixed(0) + 'kg', padding.left - 5, y + 3);
+        }
+        ctx.textAlign = 'center';
+        const labelStep = Math.max(1, Math.floor(validData.length / 5));
+        validData.forEach((d, idx) => {
+            if(idx % labelStep === 0 || idx === validData.length - 1){
+                const x = padding.left + idx * xStep;
+                const date = parseDateStr(d.date);
+                const label = `${date.getMonth()+1}/${date.getDate()}`;
+                ctx.fillText(label, x, h - 8);
+            }
+        });
+        ctx.strokeStyle = '#00FF41';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        validData.forEach((d, idx) => {
+            const x = padding.left + idx * xStep;
+            const y = padding.top + chartH * (1 - (d.load - yMin) / (yMax - yMin));
+            if(idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        validData.forEach((d, idx) => {
+            const x = padding.left + idx * xStep;
+            const y = padding.top + chartH * (1 - (d.load - yMin) / (yMax - yMin));
+            ctx.fillStyle = '#00FF41';
+            ctx.beginPath();
+            ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#FFF';
+            ctx.font = 'bold 9px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(d.load.toFixed(1), x, y - 8);
+        });
+    }
+
     function renderStats(){
         const all=aggregateAllExercises();
         if(all.length===0){ statsList.innerHTML='<div class="no-data-msg">暂无训练数据</div>'; return; }
@@ -466,21 +650,23 @@
     function renderAI(){
         const all=aggregateAllExercises();
         if(all.length===0){ aiFeedback.innerHTML='<div class="ai-item neutral">暂无数据，开始你的第一次训练吧。</div>'; return; }
-        all.sort((a,b)=>b.totalVolume-a.totalVolume);
-        const top=all[0];
+        const actionName = getFocusAction();
+        if(!actionName){ aiFeedback.innerHTML='<div class="ai-item neutral">暂无焦点动作</div>'; return; }
         const today=getTodayStr();
         const last7=getDateRange(today,7);
         const prev7=getDateRange(addDays(today,-7),7);
-        const prLast = getPRForDates(top.name,last7);
-        const prPrev = getPRForDates(top.name,prev7);
+        const prLastData = getFocusPRData(actionName, last7);
+        const prPrevData = getFocusPRData(actionName, prev7);
+        const prLast = Math.max(...prLastData, 0);
+        const prPrev = Math.max(...prPrevData, 0);
         let peakText='';
         if(prPrev>0 && prLast>0){
             const pct=Math.round(((prLast-prPrev)/prPrev)*100);
-            if(pct>0) peakText=`🔥 巅峰对比：「${top.name}」单组最高从${prPrev}升至${prLast}，提升${pct}%！`;
-            else if(pct<0) peakText=`📉 巅峰对比：「${top.name}」单组最高从${prPrev}降至${prLast}，下降${Math.abs(pct)}%。`;
-            else peakText=`📊 巅峰对比：「${top.name}」单组最高维持${prLast}，状态稳定。`;
-        } else if(prLast>0) peakText=`🚀 巅峰对比：最近7天「${top.name}」单组最高${prLast}，有新突破！`;
-        else peakText=`📊 巅峰对比：最近7天暂无「${top.name}」的PR数据。`;
+            if(pct>0) peakText=`🔥 巅峰对比：「${actionName}」近7天最高${prLast} vs 前7天${prPrev}，提升${pct}%！`;
+            else if(pct<0) peakText=`📉 巅峰对比：「${actionName}」近7天最高${prLast} vs 前7天${prPrev}，下降${Math.abs(pct)}%。`;
+            else peakText=`📊 巅峰对比：「${actionName}」近7天最高${prLast}，与前7天持平。`;
+        } else if(prLast>0) peakText=`🚀 巅峰对比：「${actionName}」近7天单组最高${prLast}，有新突破！`;
+        else peakText=`📊 巅峰对比：「${actionName}」近7天暂无PR数据。`;
 
         const now=new Date(); const y=now.getFullYear(); const m=now.getMonth(); const todayDay=now.getDate();
         let missed=0, passed=0;
@@ -506,14 +692,27 @@
 
         let loadText='';
         const weight = personalData.weight ? Number(personalData.weight) : null;
-        const loadedExercises = all.filter(ex => ex.maxLoad > 0);
-        if(loadedExercises.length > 0 && weight){
-            const bestLoaded = loadedExercises.reduce((a,b) => (a.maxLoad/a.frequency > b.maxLoad/b.frequency) ? a : b);
-            const ratio = (bestLoaded.maxLoad / weight) * 100;
-            loadText = `🏋️ 负重分析：你的「${bestLoaded.name}」最大负重${bestLoaded.maxLoad}kg，相当于体重的${ratio.toFixed(1)}%，${ratio > 50 ? '非常强悍！' : ratio > 25 ? '上肢拉力出色。' : '继续努力提升。'}`;
-        } else if(loadedExercises.length > 0){
-            const bestLoaded = loadedExercises.reduce((a,b) => a.maxLoad > b.maxLoad ? a : b);
-            loadText = `🏋️ 负重分析：你的「${bestLoaded.name}」最大负重${bestLoaded.maxLoad}kg。填写体重可计算相对力量。`;
+        let bestLoaded = null;
+        const sortedDates = Object.keys(trainingData).sort().reverse();
+        for(const dateStr of sortedDates){
+            const day = trainingData[dateStr];
+            if(day && day.status===STATUS_WORKED && Array.isArray(day.exercises)){
+                for(const ex of day.exercises){
+                    const load = Number(ex.load)||0;
+                    if(load > 0 && (!bestLoaded || load > bestLoaded.load)){
+                        bestLoaded = { name: ex.name, load };
+                    }
+                }
+            }
+            if(bestLoaded) break;
+        }
+        if(bestLoaded){
+            if(weight){
+                const ratio = (bestLoaded.load / weight) * 100;
+                loadText = `🏋️ 负重分析：「${bestLoaded.name}」最大负重${bestLoaded.load}kg，相当于体重的${ratio.toFixed(1)}%，${ratio > 50 ? '非常强悍！' : ratio > 25 ? '上肢拉力出色。' : '继续努力提升。'}`;
+            } else {
+                loadText = `🏋️ 负重分析：「${bestLoaded.name}」最大负重${bestLoaded.load}kg。填写体重可计算相对力量。`;
+            }
         }
 
         aiFeedback.innerHTML = `
@@ -522,16 +721,7 @@
             <div class="ai-item">${divText}</div>
             ${loadText ? `<div class="ai-item">${loadText}</div>` : ''}
         `;
-    }
-    function getPRForDates(name, dateList){
-        let pr=0;
-        dateList.forEach(ds=>{
-            const dd=getDayData(ds);
-            if(dd && dd.status===STATUS_WORKED) (dd.exercises||[]).forEach(ex=>{
-                if(ex.name===name && Array.isArray(ex.sets)) ex.sets.forEach(r=>{ r=Number(r)||0; if(r>pr) pr=r; });
-            });
-        });
-        return pr;
+        renderChart();
     }
 
     function switchTab(tab){
@@ -542,18 +732,17 @@
         pageStats.classList.toggle('active', tab==='stats');
         if(tab==='today'){ renderHeader(); renderStatusButtons(); renderExerciseSection(); }
         else if(tab==='calendar') renderCalendar();
-        else if(tab==='stats'){ heightInput.value=personalData.height||''; weightInput.value=personalData.weight||''; renderStats(); renderAI(); }
+        else if(tab==='stats'){
+            heightInput.value=personalData.height||''; weightInput.value=personalData.weight||'';
+            renderFocusPanel();
+            renderStats();
+            renderAI();
+        }
         $('#mainContent').scrollTop=0;
     }
 
-    // 数据导出/导入
-    function exportData() {
-        const data = {
-            version: DATA_VERSION,
-            exportedAt: new Date().toISOString(),
-            trainingData: trainingData,
-            personalData: personalData
-        };
+    function exportData(){
+        const data = { version: DATA_VERSION, exportedAt: new Date().toISOString(), trainingData, personalData };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -564,29 +753,26 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
-
-    function importData(file) {
+    function importData(file){
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function(e){
             try {
                 const data = JSON.parse(e.target.result);
-                if (!data || typeof data !== 'object') throw new Error('格式错误');
-                if (data.version !== DATA_VERSION) {
-                    if (!confirm(`备份文件版本 (${data.version}) 与当前版本 (${DATA_VERSION}) 不一致，可能无法正确导入。仍要继续吗？`)) return;
+                if(!data || typeof data !== 'object') throw new Error('格式错误');
+                if(data.version !== DATA_VERSION){
+                    if(!confirm(`备份文件版本 (${data.version}) 与当前版本 (${DATA_VERSION}) 不一致，可能无法正确导入。仍要继续吗？`)) return;
                 }
-                if (!data.trainingData || typeof data.trainingData !== 'object') throw new Error('缺少训练数据');
-                if (!data.personalData || typeof data.personalData !== 'object') data.personalData = {height:null, weight:null};
-                // 确认覆盖
-                if (confirm('导入将覆盖当前所有数据，确定继续吗？')) {
+                if(!data.trainingData || typeof data.trainingData !== 'object') throw new Error('缺少训练数据');
+                if(!data.personalData || typeof data.personalData !== 'object') data.personalData = {height:null, weight:null};
+                if(confirm('导入将覆盖当前所有数据，确定继续吗？')){
                     trainingData = data.trainingData;
                     personalData = data.personalData;
                     saveData();
                     savePersonal();
-                    // 刷新界面
                     switchTab(currentTab);
                     alert('数据导入成功！');
                 }
-            } catch (err) {
+            } catch(err) {
                 alert('导入失败：' + err.message);
             }
         };
@@ -595,10 +781,17 @@
 
     exportBtn.addEventListener('click', exportData);
     importBtn.addEventListener('click', ()=>{ importFileInput.click(); });
-    importFileInput.addEventListener('change', (e)=>{
-        const file = e.target.files[0];
-        if (file) importData(file);
-        importFileInput.value = ''; // 允许重复选择同一文件
+    importFileInput.addEventListener('change', (e)=>{ const file = e.target.files[0]; if(file) importData(file); importFileInput.value=''; });
+
+    focusSelectBtn.addEventListener('click', ()=>{ renderFocusPanel(); focusOverlay.classList.add('show'); });
+    focusOverlay.addEventListener('click', e=>{ if(e.target === focusOverlay) focusOverlay.classList.remove('show'); });
+    focusPanelList.addEventListener('click', e=>{
+        const btn = e.target.closest('.focus-panel-item');
+        if(!btn) return;
+        focusAction = btn.dataset.name;
+        focusOverlay.classList.remove('show');
+        renderFocusPanel();
+        renderAI();
     });
 
     tabBar.addEventListener('click', e=>{ const btn=e.target.closest('.tab-btn'); if(btn) switchTab(btn.dataset.tab); });
