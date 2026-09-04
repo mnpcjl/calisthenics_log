@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000">
-    <title>街头健身打卡 · v10 优化日历与休息色</title>
+    <title>街头健身打卡 · v11 动作库升级</title>
     <style>
         :root {
             --bg: #000000;
@@ -13,7 +13,6 @@
             --accent: #00FF41;
             --accent-dim: #00cc34;
             --accent-light: #7CFC00;
-            --accent-pale: #CCFFCC;
             --orange: #FF6B00;
             --red: #FF3B30;
             --text: #FFFFFF;
@@ -264,31 +263,102 @@
 </div>
 <script>
 (function() {
-    const STORAGE_KEY = 'streetWorkoutLog_v10';
-    const PERSONAL_KEY = 'streetWorkoutPersonal_v10';
+    const STORAGE_KEY = 'streetWorkoutLog_v11';
+    const PERSONAL_KEY = 'streetWorkoutPersonal_v11';
     const DATA_VERSION = 1;
     const STATUS_WORKED = 'worked';
     const STATUS_MISSED = 'missed';
     const STATUS_REST = 'rest';
 
+    // 完整动作库及英文别名（归一化后）
     const EXERCISE_TYPES = {
         '引体向上':'dynamic', '双杠臂屈伸':'dynamic', '俯卧撑':'dynamic', '深蹲':'dynamic',
         '弓箭步':'dynamic', '桥式':'dynamic', '波比跳':'dynamic', '登山跑':'dynamic',
         '悬垂举腿':'dynamic', '卷腹':'dynamic', '仰卧起坐':'dynamic', '倒立撑':'dynamic',
-        '双力臂':'dynamic', '单臂引体向上':'dynamic', '宽距引体向上':'dynamic', '反手引体向上':'dynamic',
-        '腰间俯卧撑':'dynamic', '冲刺跑':'dynamic', '俄挺俯卧撑':'dynamic', '单腿深蹲':'dynamic',
-        '负重引体向上':'dynamic', '负重双杠臂屈伸':'dynamic', '负重俯卧撑':'dynamic', '负重深蹲':'dynamic',
-        '单力臂':'dynamic', '前水平引体':'dynamic', '后水平引体':'dynamic',
-        '划船':'dynamic', '负重划船':'dynamic',
+        '双力臂':'dynamic', '单手引体向上':'dynamic', '单手反手引体向上':'dynamic', '宽距引体向上':'dynamic',
+        '反手引体向上':'dynamic', '腰间俯卧撑':'dynamic', '冲刺跑':'dynamic', '俄挺俯卧撑':'dynamic',
+        '单腿深蹲':'dynamic', '负重引体向上':'dynamic', '负重反手引体向上':'dynamic', '负重双杠臂屈伸':'dynamic',
+        '负重俯卧撑':'dynamic', '负重深蹲':'dynamic', '单力臂':'dynamic', '前水平引体':'dynamic',
+        '后水平引体':'dynamic', '划船':'dynamic', '负重划船':'dynamic',
         '前水平':'static', '后水平':'static', '人体旗帜':'static', '倒立':'static',
         'L支撑':'static', 'V支撑':'static', '俄式挺身':'static', '冲肩':'static',
         '平板支撑':'static', '龙旗':'static', '单手前水平':'static', '单手倒立':'static',
         '双杠支撑':'static', '单杠悬挂':'static', '单手俄挺':'static', '俄挺团身':'static',
         '俄挺高团':'static', '分腿俄挺':'static', '单手吊杠':'static',
-        '单杠维多利亚':'static', '单杠维多利亚低团':'static', '单杠维多利亚高团':'static'
+        '单杠维多利亚':'static', '单杠维多利亚低团':'static', '单杠维多利亚高团':'static',
+        '龙压':'static', '龙压低团':'static', '龙压高团':'static',
+        '吊环维多利亚':'static', '马耳他式':'static'
     };
     const EXERCISE_LIBRARY = Object.keys(EXERCISE_TYPES);
-    const PRESET_EXERCISES = ['引体向上', '双杠臂屈伸', '俯卧撑'];
+
+    const ALIAS_MAP = {
+        'pullup':'引体向上',
+        'dip':'双杠臂屈伸', 'dips':'双杠臂屈伸', 'parallelbardip':'双杠臂屈伸', 'parallelbarsdips':'双杠臂屈伸', 'pbardip':'双杠臂屈伸',
+        'pushup':'俯卧撑', 'pressup':'俯卧撑',
+        'squat':'深蹲', 'squats':'深蹲',
+        'lunge':'弓箭步', 'lunges':'弓箭步',
+        'bridge':'桥式', 'glutebridge':'桥式',
+        'burpee':'波比跳', 'burpees':'波比跳',
+        'mountainclimber':'登山跑', 'mountainclimbers':'登山跑',
+        'hanginglegraise':'悬垂举腿', 'legraise':'悬垂举腿',
+        'crunch':'卷腹', 'crunches':'卷腹',
+        'situp':'仰卧起坐', 'situps':'仰卧起坐',
+        'handstandpushup':'倒立撑', 'hspu':'倒立撑',
+        'muscleup':'双力臂', 'muscleups':'双力臂',
+        'onearmpullup':'单手引体向上',
+        'onearmchinup':'单手反手引体向上',
+        'widepullup':'宽距引体向上', 'widegrippullup':'宽距引体向上',
+        'chinup':'反手引体向上', 'supinatedpullup':'反手引体向上',
+        'pseudoplanchepushup':'腰间俯卧撑', 'pppu':'腰间俯卧撑',
+        'sprint':'冲刺跑', 'sprints':'冲刺跑',
+        'planchepushup':'俄挺俯卧撑',
+        'pistolsquat':'单腿深蹲',
+        'weightedpullup':'负重引体向上',
+        'weightedchinup':'负重反手引体向上',
+        'weighteddip':'负重双杠臂屈伸', 'weighteddips':'负重双杠臂屈伸',
+        'weightedpushup':'负重俯卧撑',
+        'weightedsquat':'负重深蹲',
+        'onearmmuscleup':'单力臂', 'oamu':'单力臂',
+        'frontleverpullup':'前水平引体',
+        'backleverpullup':'后水平引体',
+        'row':'划船', 'rows':'划船', 'bodyweightrow':'划船',
+        'weightedrow':'负重划船', 'weightedrows':'负重划船',
+        'frontlever':'前水平',
+        'backlever':'后水平',
+        'humanflag':'人体旗帜',
+        'handstand':'倒立',
+        'lsit':'L支撑',
+        'vsit':'V支撑',
+        'planche':'俄式挺身',
+        'pseudoplanchelean':'冲肩', 'planchelean':'冲肩',
+        'plank':'平板支撑',
+        'dragonflag':'龙旗',
+        'onearmfrontlever':'单手前水平', 'oafl':'单手前水平',
+        'onearmhandstand':'单手倒立',
+        'barsupport':'双杠支撑', 'diphold':'双杠支撑',
+        'barhang':'单杠悬挂',
+        'onearmplanche':'单手俄挺',
+        'tuckplanche':'俄挺团身',
+        'advancedtuckplanche':'俄挺高团',
+        'straddleplanche':'分腿俄挺',
+        'onearmhang':'单手吊杠', 'onearmdeadhang':'单手吊杠',
+        'pbarvictorian':'单杠维多利亚', 'pbarvic':'单杠维多利亚',
+        'pbartuckvictorian':'单杠维多利亚低团', 'pbartuckvic':'单杠维多利亚低团',
+        'pbaradvancedtuckvictorian':'单杠维多利亚高团', 'pbaradvtuckvic':'单杠维多利亚高团', 'pbaradvancetuckvic':'单杠维多利亚高团',
+        'dragonpress':'龙压',
+        'tuckdragonpress':'龙压低团',
+        'advancetuckdragonpress':'龙压高团',
+        'victorian':'吊环维多利亚', 'victoriancross':'吊环维多利亚', 'invertedswallow':'吊环维多利亚', 'vic':'吊环维多利亚',
+        'maltese':'马耳他式', 'malteseplanche':'马耳他式'
+    };
+
+    // 旧名称迁移映射
+    const MIGRATION_MAP = {
+        '单臂引体向上': '单手引体向上',
+        '单臂前水平': '单手前水平',
+        '单臂倒立': '单手倒立',
+        '反手单手引体向上': '单手反手引体向上'
+    };
 
     let trainingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     let personalData = JSON.parse(localStorage.getItem(PERSONAL_KEY) || '{"height":null,"weight":null}');
@@ -318,11 +388,26 @@
     function addDays(str, days){ const d=parseDateStr(str); d.setDate(d.getDate()+days); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
     function getDateRange(end, daysBack){ const res=[]; for(let i=daysBack-1;i>=0;i--) res.push(addDays(end,-i)); return res; }
 
+    // 归一化函数
+    function normalizeName(input){
+        if(!input) return '';
+        return String(input).toLowerCase().replace(/[\s\-_\/\.\,\'\"\:\;\(\)\[\]]/g, '');
+    }
+
+    // 解析动作名：优先匹配标准中文，其次别名，最后原样返回
+    function resolveActionName(rawName){
+        const trimmed = rawName.trim();
+        if(EXERCISE_TYPES[trimmed]) return trimmed;
+        const norm = normalizeName(trimmed);
+        if(ALIAS_MAP[norm]) return ALIAS_MAP[norm];
+        return trimmed;
+    }
+
     function isDynamicExercise(name){
         if(EXERCISE_TYPES[name]) return EXERCISE_TYPES[name] === 'dynamic';
         const lower = name.toLowerCase();
         if(lower.includes('引体') || lower.includes('俯卧撑') || lower.includes('双杠') || lower.includes('深蹲') || lower.includes('臂屈伸') || lower.includes('划船') || lower.includes('推') || lower.includes('蹲') || lower.includes('跑') || lower.includes('跳') || lower.includes('卷腹') || lower.includes('举腿') || lower.includes('撑')) return true;
-        if(lower.includes('水平') || lower.includes('倒立') || lower.includes('支撑') || lower.includes('俄挺') || lower.includes('团身') || lower.includes('高团') || lower.includes('分腿') || lower.includes('吊杠') || lower.includes('龙旗') || lower.includes('平板') || lower.includes('冲肩') || lower.includes('旗帜') || lower.includes('维多利亚')) return false;
+        if(lower.includes('水平') || lower.includes('倒立') || lower.includes('支撑') || lower.includes('俄挺') || lower.includes('团身') || lower.includes('高团') || lower.includes('分腿') || lower.includes('吊杠') || lower.includes('龙旗') || lower.includes('平板') || lower.includes('冲肩') || lower.includes('旗帜') || lower.includes('维多利亚') || lower.includes('龙压') || lower.includes('马耳他')) return false;
         return true;
     }
 
@@ -331,6 +416,27 @@
     function getDayData(dateStr){ return trainingData[dateStr] || null; }
     function setDayData(dateStr, data){ if(data.status===STATUS_MISSED || data.status===STATUS_REST) data.exercises=[]; trainingData[dateStr]=data; saveData(); }
     function getCurrentDayData(){ return getDayData(currentEditingDate) || {status:null, exercises:[]}; }
+
+    // 自动迁移旧动作名
+    function migrateActionNames(){
+        let changed = false;
+        for(const dateStr in trainingData){
+            const day = trainingData[dateStr];
+            if(day && Array.isArray(day.exercises)){
+                day.exercises.forEach(ex => {
+                    if(ex && ex.name){
+                        const oldName = ex.name;
+                        const newName = MIGRATION_MAP[oldName];
+                        if(newName && newName !== oldName){
+                            ex.name = newName;
+                            changed = true;
+                        }
+                    }
+                });
+            }
+        }
+        if(changed) saveData();
+    }
 
     function renderHeader(){
         if(isToday(currentEditingDate)){ headerDate.textContent='今日打卡'; backTodayBtn.classList.remove('show'); }
@@ -363,10 +469,6 @@
             const name = sorted[i];
             if(!seen.has(name)) { recommended.push(name); seen.add(name); }
         }
-        for(let i=0; i<PRESET_EXERCISES.length && recommended.length<3; i++){
-            const name = PRESET_EXERCISES[i];
-            if(!seen.has(name)) { recommended.push(name); seen.add(name); }
-        }
         for(let i=0; i<EXERCISE_LIBRARY.length && recommended.length<3; i++){
             const name = EXERCISE_LIBRARY[i];
             if(!seen.has(name)) { recommended.push(name); seen.add(name); }
@@ -384,8 +486,9 @@
         recommendList.innerHTML = html;
     }
     function renderSearchSuggestions(){
-        const query = searchInput.value.trim().toLowerCase();
+        const query = searchInput.value.trim();
         if(!query){ searchSuggestions.innerHTML=''; return; }
+        const normQuery = normalizeName(query);
         const allNames = new Set(EXERCISE_LIBRARY);
         for(const dateStr in trainingData){
             const day=trainingData[dateStr];
@@ -393,7 +496,10 @@
                 day.exercises.forEach(ex=>{ if(ex.name) allNames.add(ex.name); });
             }
         }
-        const matches = [...allNames].filter(n => n.toLowerCase().includes(query)).slice(0,8);
+        const matches = [...allNames].filter(n => {
+            const lower = n.toLowerCase();
+            return lower.includes(query.toLowerCase()) || normalizeName(n).includes(normQuery) || n.includes(query);
+        }).slice(0,8);
         searchSuggestions.innerHTML = matches.map(n => `<button class="suggestion-chip" data-name="${n}">${n}</button>`).join('');
     }
     function renderExerciseList(){
@@ -451,7 +557,6 @@
         calMonthLabel.textContent=`${calViewYear}年${calViewMonth+1}月`;
         const today = new Date();
         const isCurrentMonth = (calViewYear === today.getFullYear() && calViewMonth === today.getMonth());
-        // 处理浮动“回到今天”按钮
         if(!isCurrentMonth){
             const todayStatus = getDayData(getTodayStr())?.status || 'none';
             floatBackToday.className = 'float-back-today show ' + todayStatus;
@@ -827,6 +932,7 @@
                 if(confirm('导入将覆盖当前所有数据，确定继续吗？')){
                     trainingData = data.trainingData;
                     personalData = data.personalData;
+                    migrateActionNames();
                     saveData();
                     savePersonal();
                     switchTab(currentTab);
@@ -899,8 +1005,9 @@
     });
     searchInput.addEventListener('input', renderSearchSuggestions);
     searchAddBtn.addEventListener('click', ()=>{
-        const name=searchInput.value.trim();
-        if(!name) return;
+        const rawName=searchInput.value.trim();
+        if(!rawName) return;
+        const name = resolveActionName(rawName);
         const data=getCurrentDayData();
         if(data.status!==STATUS_WORKED) return;
         if(!data.exercises) data.exercises=[];
@@ -959,6 +1066,7 @@
     weightInput.addEventListener('change', ()=>{ personalData.weight=weightInput.value?Number(weightInput.value):null; savePersonal(); renderAI(); });
 
     function init(){
+        migrateActionNames();
         renderHeader(); renderStatusButtons(); renderExerciseSection(); renderCalendar();
         heightInput.value=personalData.height||''; weightInput.value=personalData.weight||'';
         renderStats(); renderAI();
