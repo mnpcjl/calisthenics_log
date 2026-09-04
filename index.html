@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000">
-    <title>街头健身打卡 · v11 动作库升级</title>
+    <title>街头健身打卡 · v12 动作库扩展</title>
     <style>
         :root {
             --bg: #000000;
@@ -263,24 +263,27 @@
 </div>
 <script>
 (function() {
-    const STORAGE_KEY = 'streetWorkoutLog_v11';
-    const PERSONAL_KEY = 'streetWorkoutPersonal_v11';
+    const STORAGE_KEY = 'streetWorkoutLog_v12';
+    const PERSONAL_KEY = 'streetWorkoutPersonal_v12';
     const DATA_VERSION = 1;
     const STATUS_WORKED = 'worked';
     const STATUS_MISSED = 'missed';
     const STATUS_REST = 'rest';
 
-    // 完整动作库及英文别名（归一化后）
+    // 完整动作库及类型
     const EXERCISE_TYPES = {
         '引体向上':'dynamic', '双杠臂屈伸':'dynamic', '俯卧撑':'dynamic', '深蹲':'dynamic',
         '弓箭步':'dynamic', '桥式':'dynamic', '波比跳':'dynamic', '登山跑':'dynamic',
         '悬垂举腿':'dynamic', '卷腹':'dynamic', '仰卧起坐':'dynamic', '倒立撑':'dynamic',
+        '深度倒立撑':'dynamic', '90度倒立撑':'dynamic',
         '双力臂':'dynamic', '单手引体向上':'dynamic', '单手反手引体向上':'dynamic', '宽距引体向上':'dynamic',
         '反手引体向上':'dynamic', '腰间俯卧撑':'dynamic', '冲刺跑':'dynamic', '俄挺俯卧撑':'dynamic',
         '单腿深蹲':'dynamic', '负重引体向上':'dynamic', '负重反手引体向上':'dynamic', '负重双杠臂屈伸':'dynamic',
         '负重俯卧撑':'dynamic', '负重深蹲':'dynamic', '单力臂':'dynamic', '前水平引体':'dynamic',
         '后水平引体':'dynamic', '划船':'dynamic', '负重划船':'dynamic',
-        '前水平':'static', '后水平':'static', '人体旗帜':'static', '倒立':'static',
+        '后背双':'dynamic', '大天使':'dynamic',
+        '前水平':'static', '后水平':'static', '反手前水平':'static', '宽距前水平':'static',
+        '人体旗帜':'static', '倒立':'static',
         'L支撑':'static', 'V支撑':'static', '俄式挺身':'static', '冲肩':'static',
         '平板支撑':'static', '龙旗':'static', '单手前水平':'static', '单手倒立':'static',
         '双杠支撑':'static', '单杠悬挂':'static', '单手俄挺':'static', '俄挺团身':'static',
@@ -304,6 +307,8 @@
         'crunch':'卷腹', 'crunches':'卷腹',
         'situp':'仰卧起坐', 'situps':'仰卧起坐',
         'handstandpushup':'倒立撑', 'hspu':'倒立撑',
+        'deephandstandpushup':'深度倒立撑', 'deephandstandpushups':'深度倒立撑',
+        '90degreehandstandpushup':'90度倒立撑', '90degreepushup':'90度倒立撑',
         'muscleup':'双力臂', 'muscleups':'双力臂',
         'onearmpullup':'单手引体向上',
         'onearmchinup':'单手反手引体向上',
@@ -323,8 +328,12 @@
         'backleverpullup':'后水平引体',
         'row':'划船', 'rows':'划船', 'bodyweightrow':'划船',
         'weightedrow':'负重划船', 'weightedrows':'负重划船',
+        'hefesto':'后背双',
+        'angelhefesto':'大天使', 'entradadeangel':'大天使',
         'frontlever':'前水平',
         'backlever':'后水平',
+        'supinatedfrontlever':'反手前水平', 'supifrontlever':'反手前水平', 'supifl':'反手前水平',
+        'widefrontlever':'宽距前水平', 'widefl':'宽距前水平',
         'humanflag':'人体旗帜',
         'handstand':'倒立',
         'lsit':'L支撑',
@@ -357,7 +366,8 @@
         '单臂引体向上': '单手引体向上',
         '单臂前水平': '单手前水平',
         '单臂倒立': '单手倒立',
-        '反手单手引体向上': '单手反手引体向上'
+        '反手单手引体向上': '单手反手引体向上',
+        '并腿俄挺': '俄式挺身'
     };
 
     let trainingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -388,13 +398,11 @@
     function addDays(str, days){ const d=parseDateStr(str); d.setDate(d.getDate()+days); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
     function getDateRange(end, daysBack){ const res=[]; for(let i=daysBack-1;i>=0;i--) res.push(addDays(end,-i)); return res; }
 
-    // 归一化函数
     function normalizeName(input){
         if(!input) return '';
         return String(input).toLowerCase().replace(/[\s\-_\/\.\,\'\"\:\;\(\)\[\]]/g, '');
     }
 
-    // 解析动作名：优先匹配标准中文，其次别名，最后原样返回
     function resolveActionName(rawName){
         const trimmed = rawName.trim();
         if(EXERCISE_TYPES[trimmed]) return trimmed;
@@ -406,7 +414,7 @@
     function isDynamicExercise(name){
         if(EXERCISE_TYPES[name]) return EXERCISE_TYPES[name] === 'dynamic';
         const lower = name.toLowerCase();
-        if(lower.includes('引体') || lower.includes('俯卧撑') || lower.includes('双杠') || lower.includes('深蹲') || lower.includes('臂屈伸') || lower.includes('划船') || lower.includes('推') || lower.includes('蹲') || lower.includes('跑') || lower.includes('跳') || lower.includes('卷腹') || lower.includes('举腿') || lower.includes('撑')) return true;
+        if(lower.includes('引体') || lower.includes('俯卧撑') || lower.includes('双杠') || lower.includes('深蹲') || lower.includes('臂屈伸') || lower.includes('划船') || lower.includes('推') || lower.includes('蹲') || lower.includes('跑') || lower.includes('跳') || lower.includes('卷腹') || lower.includes('举腿') || lower.includes('撑') || lower.includes('倒立撑') || lower.includes('90度') || lower.includes('深度') || lower.includes('后背双') || lower.includes('大天使')) return true;
         if(lower.includes('水平') || lower.includes('倒立') || lower.includes('支撑') || lower.includes('俄挺') || lower.includes('团身') || lower.includes('高团') || lower.includes('分腿') || lower.includes('吊杠') || lower.includes('龙旗') || lower.includes('平板') || lower.includes('冲肩') || lower.includes('旗帜') || lower.includes('维多利亚') || lower.includes('龙压') || lower.includes('马耳他')) return false;
         return true;
     }
@@ -417,7 +425,6 @@
     function setDayData(dateStr, data){ if(data.status===STATUS_MISSED || data.status===STATUS_REST) data.exercises=[]; trainingData[dateStr]=data; saveData(); }
     function getCurrentDayData(){ return getDayData(currentEditingDate) || {status:null, exercises:[]}; }
 
-    // 自动迁移旧动作名
     function migrateActionNames(){
         let changed = false;
         for(const dateStr in trainingData){
@@ -496,10 +503,24 @@
                 day.exercises.forEach(ex=>{ if(ex.name) allNames.add(ex.name); });
             }
         }
-        const matches = [...allNames].filter(n => {
-            const lower = n.toLowerCase();
-            return lower.includes(query.toLowerCase()) || normalizeName(n).includes(normQuery) || n.includes(query);
-        }).slice(0,8);
+        // 模糊匹配：中文包含、英文别名包含、或前缀匹配
+        const matches = [...allNames].map(name => {
+            const lower = name.toLowerCase();
+            const normName = normalizeName(name);
+            let score = 0;
+            if(lower.includes(query.toLowerCase())) score = 100;
+            if(normName.includes(normQuery)) score = Math.max(score, 80);
+            if(normName.startsWith(normQuery)) score = Math.max(score, 90);
+            if(score > 0) return { name, score };
+            // 检查别名
+            for(const [alias, target] of Object.entries(ALIAS_MAP)){
+                if(target === name && alias.includes(normQuery)){
+                    return { name, score: 70 };
+                }
+            }
+            return null;
+        }).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,8).map(item => item.name);
+
         searchSuggestions.innerHTML = matches.map(n => `<button class="suggestion-chip" data-name="${n}">${n}</button>`).join('');
     }
     function renderExerciseList(){
