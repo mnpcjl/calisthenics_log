@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000">
-    <title>街头健身打卡 · v12 动作库扩展</title>
+    <title>街头健身打卡 · v14 焦点优化</title>
     <style>
         :root {
             --bg: #000000;
@@ -81,6 +81,7 @@
         .exercise-card { background: var(--card-bg); border-radius: var(--radius); padding: 14px; border: 1px solid var(--border); transition: var(--transition); }
         .exercise-card .card-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
         .exercise-card .ex-name { font-weight: 700; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pr-badge { display: inline-block; background: var(--orange); color: #000; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 10px; margin-left: 4px; letter-spacing: 0.5px; }
         .mode-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px; letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0; }
         .mode-badge.dynamic { background: rgba(0,255,65,0.15); color: var(--accent); }
         .mode-badge.static { background: rgba(255,107,0,0.15); color: var(--orange); }
@@ -263,14 +264,13 @@
 </div>
 <script>
 (function() {
-    const STORAGE_KEY = 'streetWorkoutLog_v12';
-    const PERSONAL_KEY = 'streetWorkoutPersonal_v12';
+    const STORAGE_KEY = 'streetWorkoutLog_v14';
+    const PERSONAL_KEY = 'streetWorkoutPersonal_v14';
     const DATA_VERSION = 1;
     const STATUS_WORKED = 'worked';
     const STATUS_MISSED = 'missed';
     const STATUS_REST = 'rest';
 
-    // 完整动作库及类型
     const EXERCISE_TYPES = {
         '引体向上':'dynamic', '双杠臂屈伸':'dynamic', '俯卧撑':'dynamic', '深蹲':'dynamic',
         '弓箭步':'dynamic', '桥式':'dynamic', '波比跳':'dynamic', '登山跑':'dynamic',
@@ -361,7 +361,6 @@
         'maltese':'马耳他式', 'malteseplanche':'马耳他式'
     };
 
-    // 旧名称迁移映射
     const MIGRATION_MAP = {
         '单臂引体向上': '单手引体向上',
         '单臂前水平': '单手前水平',
@@ -503,7 +502,6 @@
                 day.exercises.forEach(ex=>{ if(ex.name) allNames.add(ex.name); });
             }
         }
-        // 模糊匹配：中文包含、英文别名包含、或前缀匹配
         const matches = [...allNames].map(name => {
             const lower = name.toLowerCase();
             const normName = normalizeName(name);
@@ -512,7 +510,6 @@
             if(normName.includes(normQuery)) score = Math.max(score, 80);
             if(normName.startsWith(normQuery)) score = Math.max(score, 90);
             if(score > 0) return { name, score };
-            // 检查别名
             for(const [alias, target] of Object.entries(ALIAS_MAP)){
                 if(target === name && alias.includes(normQuery)){
                     return { name, score: 70 };
@@ -522,6 +519,21 @@
         }).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,8).map(item => item.name);
 
         searchSuggestions.innerHTML = matches.map(n => `<button class="suggestion-chip" data-name="${n}">${n}</button>`).join('');
+    }
+    function getHistoricalPR(actionName, excludeDate) {
+        let pr = 0;
+        for(const dateStr in trainingData){
+            if(dateStr === excludeDate) continue;
+            const day = trainingData[dateStr];
+            if(day && day.status === STATUS_WORKED && Array.isArray(day.exercises)){
+                day.exercises.forEach(ex => {
+                    if(ex.name === actionName && Array.isArray(ex.sets)){
+                        ex.sets.forEach(r => { r=Number(r)||0; if(r > pr) pr = r; });
+                    }
+                });
+            }
+        }
+        return pr;
     }
     function renderExerciseList(){
         const exercises = getCurrentDayData().exercises || [];
@@ -554,9 +566,15 @@
             }
             const loadVal = ex.load || 0;
             inputsHtml += `<div class="load-input-group"><label>负重kg</label><input type="number" inputmode="decimal" min="0" max="500" step="0.5" value="${loadVal}" data-idx="${idx}" data-field="load" class="load-field"></div>`;
+
+            const histPR = getHistoricalPR(ex.name, currentEditingDate);
+            const currentMax = Math.max(...ex.sets.map(Number), 0);
+            const isPR = histPR > 0 && currentMax > histPR;
+            const prBadge = isPR ? '<span class="pr-badge">PR</span>' : '';
+
             html += `<div class="exercise-card" data-idx="${idx}">
                 <div class="card-header">
-                    <span class="ex-name">${ex.name}</span>
+                    <span class="ex-name">${ex.name} ${prBadge}</span>
                     <span class="mode-badge ${badgeClass}">${typeLabel}</span>
                     <div class="card-actions">
                         <button class="card-action-btn switch-btn" data-idx="${idx}" data-action="toggleMode">⇄</button>
@@ -621,7 +639,7 @@
             (day.exercises||[]).forEach(ex=>{
                 if(!ex || !ex.name || !Array.isArray(ex.sets) || ex.sets.length===0) return;
                 const name=ex.name.trim(); if(!name) return;
-                if(!map[name]) map[name]={name, pr:0, low:Infinity, totalVolume:0, frequency:0, prLoad:0, totalLoad:0, maxLoad:0, loadCount:0};
+                if(!map[name]) map[name]={name, pr:0, low:Infinity, totalVolume:0, frequency:0, prLoad:0, totalLoad:0, maxLoad:0, loadCount:0, isDynamic: isDynamicExercise(name)};
                 const entry=map[name];
                 const isDyn = isDynamicExercise(name);
                 ex.sets.forEach(rep=>{
@@ -653,8 +671,30 @@
         return [...set];
     }
 
+    // 优化后的焦点动作默认选择策略
     function getFocusAction(){
         if(focusAction) return focusAction;
+        // 按日期降序排列，找最近有训练记录的日期
+        const sortedDates = Object.keys(trainingData).sort((a,b)=>b.localeCompare(a));
+        for(const dateStr of sortedDates){
+            const day = trainingData[dateStr];
+            if(day && day.status === STATUS_WORKED && Array.isArray(day.exercises) && day.exercises.length > 0){
+                // 在该日期的动作中选容量最高的
+                let bestAction = null;
+                let bestVolume = -1;
+                day.exercises.forEach(ex => {
+                    if(ex && Array.isArray(ex.sets)){
+                        const volume = ex.sets.reduce((sum, r) => sum + (Number(r)||0), 0);
+                        if(volume > bestVolume){
+                            bestVolume = volume;
+                            bestAction = ex.name;
+                        }
+                    }
+                });
+                if(bestAction) return bestAction;
+            }
+        }
+        // 回退：全局容量最高
         const all = aggregateAllExercises();
         if(all.length === 0) return null;
         all.sort((a,b)=>b.totalVolume-a.totalVolume);
@@ -876,6 +916,23 @@
             divText = `🎯 动作多样性：本月使用${exerciseListArr.length}个动作：${exerciseListArr.slice(0,3).join('、')}等。`;
         }
 
+        let dynVolume = 0, staticVolume = 0;
+        for(const dateStr in trainingData){
+            const day = trainingData[dateStr];
+            if(day && day.status === STATUS_WORKED && Array.isArray(day.exercises)){
+                day.exercises.forEach(ex => {
+                    if(ex && Array.isArray(ex.sets)){
+                        if(isDynamicExercise(ex.name)){
+                            ex.sets.forEach(r => dynVolume += Number(r)||0);
+                        } else {
+                            ex.sets.forEach(r => staticVolume += Number(r)||0);
+                        }
+                    }
+                });
+            }
+        }
+        const volumeText = `📊 容量分离：动态总次数 ${dynVolume} 次，静态总秒数 ${staticVolume} 秒。`;
+
         let loadText='';
         const weight = personalData.weight ? Number(personalData.weight) : null;
         let bestLoaded = null;
@@ -905,6 +962,7 @@
             <div class="ai-item">${peakText}</div>
             <div class="ai-item">${willText}</div>
             <div class="ai-item">${divText}</div>
+            <div class="ai-item">${volumeText}</div>
             ${loadText ? `<div class="ai-item">${loadText}</div>` : ''}
         `;
         renderChart();
